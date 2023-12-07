@@ -173,13 +173,12 @@ Bienvenido a CyberTec
         const newGameId = newGame.id // get the id of the new-game
         var newStudentPlay = document.getElementById('cyber__student__list__' + newGameId);  // get the new element to append the student
         
-      
         const data_add = {
             'student_id': studentId,
             'game_id': newGameId,
             csrfmiddlewaretoken: csrftoken,
         };
-
+        
         $.ajax({
             type: "POST",
             url: "/api/add-student-to-game/",
@@ -189,24 +188,63 @@ Bienvenido a CyberTec
             },
             dataType: "json",
             success: async function (data) {
-                // Handle successful response
-                if (data.status === "success") {
-                  // Update the UI to reflect the changed student
-                  if (studentElement && newStudentPlay) { // Check if both elements exist
-                      studentElement.parentNode.removeChild(studentElement);
-                      newStudentPlay.appendChild(studentElement);
-                  } else {
-                      console.error("Either the element to remove or the parent element does not exist.");
-                  }
-                  $("#success-alert").text(data.message);
-                  $("#success-alert").removeClass("d-none");
-                  setTimeout(function () {
-                        $("#success-alert").addClass("d-none");
-                  }, 3000);
+              // Handle successful response
+              if (data.status === "success") {
+                // Update the UI to reflect the changed student
+                if (studentElement && newStudentPlay) { // Check if both elements exist
+                  studentElement.parentNode.removeChild(studentElement);
+                  newStudentPlay.appendChild(studentElement);
+                } else {
+                  console.error("Either the element to remove or the parent element does not exist.");
                 }
+                $("#success-alert").text(data.message);
+                $("#success-alert").removeClass("d-none");
+                
+                // TODO Cambiar jajajaj
+                if (data.message === "Alumno cambiado de juego") {
+                  old_game_id = findGameIdByPlayerId(studentId);
+                  changeToGame(studentId, gameId);
+                  games_data[old_game_id].players_count -= 1;
+                  const oldPlayersCount = $(`#cyber__game__players__count__${old_game_id}`);
+                  oldPlayersCount.empty();
+                  if (games_data[old_game_id].players_count > 0) {
+                      oldPlayersCount.append(`<span>${games_data[old_game_id].players_count} jugadores</span><br>`);
+                  }
+
+                  // Send a message to the updates socket
+                  updatesSocket.send(JSON.stringify({
+                    'message': 'Plays updated',
+                    'info': old_game_id,
+                    'sender': user_username,
+                  }));
+                  console.log("Student changed to game successfully:", studentId);
+                }
+
+                // Send a message to the updates socket
+                updatesSocket.send(JSON.stringify({
+                  'message': 'Plays updated',
+                  'info': gameId,
+                  'sender': user_username,
+                }));
+
+
+                games_data[gameId].players_count += 1;
+                const playersCount = $(`#cyber__game__players__count__${gameId}`);
+                playersCount.empty();
+                if (games_data[gameId].players_count > 0) {
+                    playersCount.append(`<span>${games_data[gameId].players_count} jugadores</span><br>`);
+                }
+
+                // Refresh the UI functionality
+                await fetchGameStartTimes();
+
+                setTimeout(function () {
+                  $("#success-alert").addClass("d-none");
+                }, 3000);
+              }
             },
             error: function (xhr, status, error) {
-                console.error("AJAX request failed:", status, error);
+              console.error("AJAX request failed:", status, error);
             },
           })
         cardContainer.style.backgroundColor = ''
@@ -216,8 +254,8 @@ Bienvenido a CyberTec
     function findDesiredParentByClass(element, desiredClassName) {
       let currentElement = element;
       while (currentElement !== null) {
-          if (currentElement.classList.contains(desiredClassName)) {
-              return currentElement;
+        if (currentElement.classList.contains(desiredClassName)) {
+          return currentElement;
           }
           currentElement = currentElement.parentNode;
       }
