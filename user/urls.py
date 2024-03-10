@@ -1,9 +1,10 @@
 from django.urls import path
-from .views import UserListCreateView, UserDetailView, UserMeDetails
+from .views import UserListCreateView, UserDetailView, UserMeDetails, UserSendAccessToEmail
 
 urlpatterns = [
     # Manage Users
     path("", UserListCreateView.as_view(), name="user-list"),
     path("<int:pk>/", UserDetailView.as_view(), name="user-detail"),
     path("me/", UserMeDetails.as_view(), name="user-me"),
+    path("send-access/", UserSendAccessToEmail.as_view(), name="user-send-access-to-email"),
 ]

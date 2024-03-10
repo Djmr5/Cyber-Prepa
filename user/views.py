@@ -6,6 +6,9 @@ from .serializers import UserSerializer, UserReadSerializer
 from main.permissions import IsActive, IsSameUserOrStaff, IsInAdminGroupOrStaff
 from .models import User
 from drf_spectacular.utils import extend_schema
+from django.conf import settings
+from django.core.mail import send_mail
+from rest_framework_simplejwt.tokens import AccessToken
 import logging
 
 transaction_logger = logging.getLogger("transactions")
@@ -83,8 +86,10 @@ class UserDetailView(generics.GenericAPIView):
         )
         return Response(serializer.data)
 
+
 class UserMeDetails(generics.RetrieveAPIView):
-    """ Read User(me) """
+    """Read User(me)"""
+
     serializer_class = UserReadSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsActive]
@@ -96,3 +101,37 @@ class UserMeDetails(generics.RetrieveAPIView):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+
+class UserSendAccessToEmail(generics.GenericAPIView):
+    """Send Access to Email"""
+
+    def post(self, request, *args, **kwargs):
+        user_email = request.data.get("email")
+        user = User.objects.get(email=user_email)
+        if not user:
+            return Response(
+                {
+                    "detail": "If an account with this email exists, an email will be sent"
+                },
+                status=status.HTTP_200_OK,
+            )
+        
+        # Get access token
+        access = AccessToken.for_user(user)
+        
+        # Send email
+        send_mail(
+            "Access Request",
+            f"An access request has been made to your account access the following link to reset your password \
+            {settings.FRONTEND_URL}/reset-password?token={access} \
+            If you did not make this request, please ignore this email.",
+            settings.EMAIL_HOST_USER,
+            [user.email],
+        )
+
+        transaction_logger.info(f"An access request to {user.email} has been made and sent to {user.email}")
+        return Response(
+            {"detail": "If an account with this email exists, an email will be sent"},
+            status=status.HTTP_200_OK,
+        )
